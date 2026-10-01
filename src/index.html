@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinic Patient Registration System</title>
+<style>
+:root{--ink:#14302e;--muted:#5b716f;--bg:#eef4f3;--card:#fff;--line:#cfdedc;--accent:#0b6e69;--accent-d:#084f4b;--bad:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;font-family:Georgia,"Times New Roman",serif;color:var(--ink);background:var(--bg);line-height:1.5}
+h1,h2,label,button,input,select,th{font-family:"Segoe UI",Arial,sans-serif}
+header{background:var(--accent-d);color:#fff;padding:28px 20px}
+header div,main{max-width:1000px;margin:0 auto}
+h1{margin:0;font-size:1.7rem;font-weight:700}
+header p{margin:6px 0 0;opacity:.85}
+main{padding:20px;display:grid;gap:20px;grid-template-columns:1fr 1fr}
+section{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:18px}
+section.wide{grid-column:1/-1}
+h2{margin:0 0 12px;font-size:1.1rem}
+label{display:block;font-size:.85rem;margin:10px 0 3px;color:var(--muted)}
+input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:4px;font-size:.95rem;background:#fff}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{margin-top:14px;padding:9px 16px;border:0;border-radius:4px;background:var(--accent);color:#fff;font-size:.95rem;cursor:pointer}
+button:hover{background:var(--accent-d)}
+button.small{margin:0;padding:5px 10px;background:#fff;color:var(--bad);border:1px solid var(--bad)}
+button.small:hover{background:var(--bad);color:#fff}
+.msg{min-height:1.3em;margin-top:10px;font-size:.9rem;font-family:"Segoe UI",Arial,sans-serif}
+.ok{color:var(--accent)}.err{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+.row{display:flex;gap:12px}.row>div{flex:1}
+.empty{color:var(--muted);padding:12px 0}
+.scroll{overflow-x:auto}
+@media(max-width:760px){main{grid-template-columns:1fr}.row{flex-direction:column;gap:0}}
+</style>
+</head>
+<body>
+<header><div>
+<h1>Емхана пациенттерін тіркеу жүйесі</h1>
+<p>Пациентті тіркеу, дәрігерге жазу және қабылдау кестесін басқару</p>
+</div></header>
+
+<main>
+<section>
+<h2>Жаңа пациентті тіркеу</h2>
+<label for="fio">Аты-жөні</label><input id="fio" placeholder="Мысалы: Серіков Али">
+<label for="iin">ЖСН (12 сан)</label><input id="iin" inputmode="numeric" maxlength="12">
+<div class="row">
+<div><label for="phone">Телефон</label><input id="phone" placeholder="+7 7xx xxx xx xx"></div>
+<div><label for="birth">Туған күні</label><input id="birth" type="date"></div>
+</div>
+<button id="addPatient">Пациентті тіркеу</button>
+<div class="msg" id="msgPatient"></div>
+</section>
+
+<section>
+<h2>Қабылдауға жазу</h2>
+<label for="selPatient">Пациент</label><select id="selPatient"></select>
+<label for="selDoctor">Дәрігер</label><select id="selDoctor"></select>
+<div class="row">
+<div><label for="date">Күні</label><input id="date" type="date"></div>
+<div><label for="time">Уақыты</label><select id="time"></select></div>
+</div>
+<button id="book">Жазу</button>
+<div class="msg" id="msgBook"></div>
+</section>
+
+<section class="wide">
+<h2>Қабылдау кестесі</h2>
+<div class="row">
+<div><label for="fDoctor">Дәрігер</label><select id="fDoctor"></select></div>
+<div><label for="fDate">Күні</label><input id="fDate" type="date"></div>
+</div>
+<div class="scroll" id="appts"></div>
+</section>
+
+<section class="wide">
+<h2>Пациенттер тізімі</h2>
+<label for="q">Іздеу (аты-жөні, ЖСН немесе телефон)</label>
+<input id="q" placeholder="Іздеу...">
+<div class="scroll" id="patients"></div>
+</section>
+</main>
+
+<script>
+const DOCTORS=["Терапевт — Ахметова А.","Хирург — Нұрланов Б.","Невролог — Садықова Д.","Педиатр — Қасымов Е."];
+const SLOTS=[];for(let h=9;h<17;h++){["00","30"].forEach(m=>SLOTS.push(String(h).padStart(2,"0")+":"+m));}
+let patients=[],appts=[];
+try{patients=JSON.parse(localStorage.getItem("patients")||"[]");appts=JSON.parse(localStorage.getItem("appts")||"[]");}catch(e){}
+function save(){try{localStorage.setItem("patients",JSON.stringify(patients));localStorage.setItem("appts",JSON.stringify(appts));}catch(e){}}
+const $=id=>document.getElementById(id);
+function say(id,t,ok){const el=$(id);el.textContent=t;el.className="msg "+(ok?"ok":"err");}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function fmt(d){return d?d.split("-").reverse().join("."):"";}
+
+function addPatient(){
+  const fio=$("fio").value.trim(),iin=$("iin").value.trim(),phone=$("phone").value.trim(),birth=$("birth").value;
+  if(!fio||!iin||!phone||!birth)return say("msgPatient","Барлық өрісті толтырыңыз.");
+  if(!/^\d{12}$/.test(iin))return say("msgPatient","ЖСН 12 саннан тұруы керек.");
+  if(patients.some(p=>p.iin===iin))return say("msgPatient","Бұл ЖСН бойынша пациент тіркелген.");
+  patients.push({id:Date.now(),fio,iin,phone,birth});save();
+  ["fio","iin","phone","birth"].forEach(i=>$(i).value="");
+  say("msgPatient","Пациент тіркелді: "+fio,true);render();
+}
+function takenSlots(doc,date){return appts.filter(a=>a.doctor===doc&&a.date===date).map(a=>a.time);}
+function fillTimes(){
+  const taken=takenSlots($("selDoctor").value,$("date").value);
+  $("time").innerHTML=SLOTS.map(t=>`<option value="${t}" ${taken.includes(t)?"disabled":""}>${t}${taken.includes(t)?" (бос емес)":""}</option>`).join("");
+  const free=SLOTS.find(t=>!taken.includes(t));if(free)$("time").value=free;
+}
+function book(){
+  const pid=Number($("selPatient").value),doctor=$("selDoctor").value,date=$("date").value,time=$("time").value;
+  if(!pid)return say("msgBook","Алдымен пациентті тіркеңіз.");
+  if(!date)return say("msgBook","Күнді таңдаңыз.");
+  if(takenSlots(doctor,date).includes(time))return say("msgBook","Бұл уақыт бос емес. Басқа уақытты таңдаңыз.");
+  appts.push({id:Date.now(),pid,doctor,date,time});save();
+  say("msgBook","Жазылу сақталды: "+fmt(date)+", "+time,true);render();
+}
+function cancel(id){appts=appts.filter(a=>a.id!==id);save();say("msgBook","Жазылу болдырылмады.",true);render();}
+
+function render(){
+  const cur=$("selPatient").value;
+  $("selPatient").innerHTML=patients.length?patients.map(p=>`<option value="${p.id}">${esc(p.fio)} (${esc(p.iin)})</option>`).join(""):'<option value="">Пациент жоқ</option>';
+  if(cur)$("selPatient").value=cur;
+  fillTimes();
+  const fd=$("fDoctor").value,fdt=$("fDate").value;
+  const list=appts.filter(a=>(!fd||a.doctor===fd)&&(!fdt||a.date===fdt)).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  $("appts").innerHTML=list.length?`<table><tr><th>Күні</th><th>Уақыты</th><th>Дәрігер</th><th>Пациент</th><th></th></tr>${list.map(a=>{
+    const p=patients.find(x=>x.id===a.pid);
+    return `<tr><td>${fmt(a.date)}</td><td>${a.time}</td><td>${esc(a.doctor)}</td><td>${p?esc(p.fio):"—"}</td><td><button class="small" onclick="cancel(${a.id})">Болдырмау</button></td></tr>`;}).join("")}</table>`
+    :'<div class="empty">Жазылулар жоқ. Жоғарыдағы форма арқылы пациентті қабылдауға жазыңыз.</div>';
+  const q=$("q").value.trim().toLowerCase();
+  const pl=patients.filter(p=>!q||[p.fio,p.iin,p.phone].some(v=>v.toLowerCase().includes(q)));
+  $("patients").innerHTML=pl.length?`<table><tr><th>Аты-жөні</th><th>ЖСН</th><th>Телефон</th><th>Туған күні</th></tr>${pl.map(p=>`<tr><td>${esc(p.fio)}</td><td>${esc(p.iin)}</td><td>${esc(p.phone)}</td><td>${fmt(p.birth)}</td></tr>`).join("")}</table>`
+    :'<div class="empty">Пациент табылмады.</div>';
+}
+
+$("selDoctor").innerHTML=DOCTORS.map(d=>`<option>${d}</option>`).join("");
+$("fDoctor").innerHTML='<option value="">Барлық дәрігерлер</option>'+DOCTORS.map(d=>`<option>${d}</option>`).join("");
+$("date").value=new Date().toISOString().slice(0,10);
+$("addPatient").onclick=addPatient;$("book").onclick=book;
+["selDoctor","date"].forEach(i=>$(i).onchange=fillTimes);
+["fDoctor","fDate"].forEach(i=>$(i).onchange=render);
+$("q").oninput=render;
+render();
+</script>
+</body>
+</html>
