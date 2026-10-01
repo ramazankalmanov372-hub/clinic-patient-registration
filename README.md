@@ -28,4 +28,4 @@ tests/  - тестілер
 Аты-жөні, тобы.
 
 ## Technologies
-Git, GitHub, Visual Studio Code, Python.
+Git, GitHub, Visual Studio Code, HTML, CSS, JavaScript.
